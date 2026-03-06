@@ -80,9 +80,12 @@ static void initBuildVariables(void)
     #if defined(_FB_DEPTH)
         snprintf (build_variables, sizeof(build_variables), "FB_DEPTH=%d ", _FB_DEPTH);
     #endif
+    #if defined(_SERVER_ALIAS)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "SERVER_ALIAS=%s ", _SERVER_ALIAS);
+    #endif
     #if defined(_WIFI_NEVER)
         strcat(build_variables, "WIFI_NEVER=1 ");
-    #endif
+    #endif	
     strTrimAll (build_variables);
 }
 
