@@ -83,6 +83,12 @@ static void initBuildVariables(void)
     #if defined(_P_A)
         snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_A=%s ", _P_A);
     #endif
+    #if defined(_P_B)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_B=%s ", _P_B);
+    #endif
+    #if defined(_P_S)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_S=%s ", _P_S);
+    #endif
     #if defined(_WIFI_NEVER)
         strcat(build_variables, "WIFI_NEVER=1 ");
     #endif	
