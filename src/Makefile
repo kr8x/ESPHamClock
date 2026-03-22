@@ -21,6 +21,21 @@ ifdef FB_DEPTH
     CXXFLAGS += -D_FB_DEPTH=$(FB_DEPTH)
 endif
 
+# add server alias as _P_A if defined
+ifdef P_A
+    CXXFLAGS += -D_P_A=$(P_A)
+endif
+
+# add backend server as _P_B if defined
+ifdef P_B
+    CXXFLAGS += -D_P_B=$(P_B)
+endif
+
+# add software download server as _P_S if defined
+ifdef P_S
+    CXXFLAGS += -D_P_S=$(P_S)
+endif
+
 # handle WiFi configuration
 ifeq ($(WIFI_NEVER),1)
     CXXFLAGS += -D_WIFI_NEVER
