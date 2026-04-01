@@ -80,14 +80,14 @@ static void initBuildVariables(void)
     #if defined(_FB_DEPTH)
         snprintf (build_variables, sizeof(build_variables), "FB_DEPTH=%d ", _FB_DEPTH);
     #endif
-    #if defined(_P_A)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_A=%s ", _P_A);
+    #if defined(_A)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DA=%s ", _A);
     #endif
-    #if defined(_P_B)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_B=%s ", _P_B);
+    #if defined(_B)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DB=%s ", _B);
     #endif
-    #if defined(_P_S)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DP_S=%s ", _P_S);
+    #if defined(_S)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DS=%s ", _S);
     #endif
     #if defined(_WIFI_NEVER)
         strcat(build_variables, "WIFI_NEVER=1 ");
