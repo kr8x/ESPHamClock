@@ -22,18 +22,17 @@ ifdef FB_DEPTH
 endif
 
 # add server alias as _P_A if defined
-ifdef P_A
-    CXXFLAGS += -D_P_A=$(P_A)
+ifdef A
+    CXXFLAGS += -D_A=$(A)
 endif
-
 # add backend server as _P_B if defined
-ifdef P_B
-    CXXFLAGS += -D_P_B=$(P_B)
+ifdef B
+    CXXFLAGS += -D_B=$(B)
 endif
 
 # add software download server as _P_S if defined
-ifdef P_S
-    CXXFLAGS += -D_P_S=$(P_S)
+ifdef S
+    CXXFLAGS += -D_S=$(S)
 endif
 
 # handle WiFi configuration
