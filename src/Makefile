@@ -21,9 +21,9 @@ ifdef FB_DEPTH
     CXXFLAGS += -D_FB_DEPTH=$(FB_DEPTH)
 endif
 
-# add server alias as _P_A if defined
-ifdef A
-    CXXFLAGS += -D_A=$(A)
+# add server alias as _T if defined
+ifdef T
+    CXXFLAGS += -D_T=$(T)
 endif
 # add backend server as _P_B if defined
 ifdef B
@@ -33,6 +33,10 @@ endif
 # add software download server as _P_S if defined
 ifdef S
     CXXFLAGS += -D_S=$(S)
+endif
+# 
+ifeq ($(VERSION_HTTPS),1)
+    CXXFLAGS += -D_VERSION_HTTPS
 endif
 
 # handle WiFi configuration
@@ -186,15 +190,16 @@ help:
 	@printf "Optional command line variables which may be set before the desired target:\n"
 	@printf "    FB_DEPTH=16 or 32         - Specify a given frame buffer pixel size (default is 32 on all but fb0)\n"
 	@printf "    WIFI_NEVER=1              - Disable WiFi fields in setup (already the default on all but fb0)\n"
-
-
+	@printf "KR8X Optional Additions:\n"
+	@printf "    B=backend                 - Set backend server default so -b is not required, format host:port\n"
+	@printf "    S=software                - Set software server default so -S is not required. format host.domain\n"
+	@printf "    T=time                    - Set timout default (seconds) so -b is not required if timout to backend need to be increased\n"
+ 	
 # supporting libs
 hclibs:
 	$(MAKE) -C ArduinoLib libarduino.a
 	$(MAKE) -C wsServer libws.a
 	$(MAKE) -C zlib-hc libzlib-hc.a
-
-
 
 # X11 versions
 

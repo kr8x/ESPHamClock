@@ -6,13 +6,21 @@
 #include "IPAddress.h"
 #include "WiFiClient.h"
 
+// global
+int timeout_ms_default=READ_PENDING_MS; 
+void WiFiClientSetDefaultTimeout (int l){	// Call once to affect all new instances
+  timeout_ms_default=l*1000;
+}
+
 // default constructor
 WiFiClient::WiFiClient()
 {
         // init
 	socket = -1;
 	n_peek = 0;
-        next_peek = 0;
+    next_peek = 0;
+	m_isPipe = false;
+    m_pipe = nullptr;	
 }
 
 // constructor handed an open socket to use
@@ -24,7 +32,9 @@ WiFiClient::WiFiClient(int fd)
         // init
 	socket = fd;
 	n_peek = 0;
-        next_peek = 0;
+    next_peek = 0;
+	m_isPipe = false;
+    m_pipe = nullptr;	
 }
 
 // return whether this socket is active
@@ -98,12 +108,44 @@ int WiFiClient::tout (int to_ms, int fd)
 }
 
 
+/* Add this new method to WiFiClient (e.g. in the .cpp file) */
+/* Call it instead of connect() when you want to run curl via a pipe */
+bool WiFiClient::connectCommand(const char* command)
+{
+    /* clean up any previous pipe */
+    if (m_pipe) {
+        pclose(m_pipe);
+        m_pipe = nullptr;
+    }
+    m_isPipe = false;
+
+    m_pipe = popen(command, "r");
+    if (!m_pipe) {
+        return false;
+    }
+
+    socket = fileno(m_pipe);   /* reuse the same "socket" member as the file descriptor */
+    if (socket < 0) {
+        pclose(m_pipe);
+        m_pipe = nullptr;
+        return false;
+    }
+
+    m_isPipe = true;
+    n_peek = 0;
+    next_peek = 0;
+
+    return true;
+}
+
 bool WiFiClient::connect(const char *host, int port)
 {
         struct addrinfo hints, *aip;
         char port_str[16];
         int sockfd;
-
+		/* connect is not a socket so clear pipe information */
+		m_isPipe = false;
+		m_pipe = nullptr;
         /* lookup host address.
          * N.B. must call freeaddrinfo(aip) after successful call before returning
          */
@@ -166,16 +208,22 @@ void WiFiClient::setNoDelay(bool on)
 
 void WiFiClient::stop()
 {
-	if (socket >= 0) {
+	if (m_isPipe) {
+        if (m_pipe != nullptr) {
+            pclose(m_pipe);
+            m_pipe = nullptr;
+        }
+        m_isPipe = false;
+    } else if (socket >= 0) {
             if (debugLevel (DEBUG_NET, 1))
                 printf ("WiFiCl: stopping fd %d\n", socket);
 	    shutdown (socket, SHUT_RDWR);
 	    close (socket);
 	    socket = -1;
-	    n_peek = 0;
-            next_peek = 0;
 	} else if (debugLevel (DEBUG_NET, 2))
             printf ("WiFiCl: fd %d already stopped\n", socket);
+	n_peek = 0;
+    next_peek = 0;
 }
 
 bool WiFiClient::connected()
@@ -249,12 +297,12 @@ int WiFiClient::available (int pending_ms)
 	}
 }
 
-/* wait as long as READ_PENDING_MS read next char.
+/* wait as long as timeout_ms_default read next char.
  * return char else -1 if EOF
  */
 int WiFiClient::read()
 {
-        if (available (READ_PENDING_MS)) {
+        if (available (timeout_ms_default)) {
             uint8_t p = peek[next_peek++];
             if (debugLevel (DEBUG_NET, 3)) {
                 int n_more = n_peek - next_peek;
@@ -268,14 +316,14 @@ int WiFiClient::read()
 	return (-1);
 }
 
-/* wait as long as READ_PENDING_MS to read up to count more bytes into array.
+/* wait as long as timeout_ms_default to read up to count more bytes into array.
  * return actual count or 0 when no more.
  */
 int WiFiClient::readArray (uint8_t *array, long count)
 {
         int n_return = 0;
 
-        if (available (READ_PENDING_MS)) {
+        if (available (timeout_ms_default)) {
             int n_available = n_peek - next_peek;
             n_return = count > n_available ? n_available : count;
             memcpy (array, &peek[next_peek], n_return);

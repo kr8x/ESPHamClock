@@ -7,6 +7,8 @@
 // host name and port of backend server
 const char *backend_host = "clearskyinstitute.com";
 int backend_port = 80;
+// host name of software server 
+const char *software_host = "clearskyinstitute.com";
 
 // IP where server thinks we came from
 char remote_addr[16];                           // INET_ADDRSTRLEN
@@ -1420,6 +1422,23 @@ void httpHCGET (WiFiClient &client, const char *server, const char *hc_page)
     char *full_hc_page = (char *) full_mem.getMem();
     snprintf (full_hc_page, full_mem.getSize(), "%s%s", hc, hc_page);
     httpGET (client, server, full_hc_page);
+}
+
+/* issue an HTTPS Get to a /ham/HamClock page named in ram by using a curl command
+ */
+
+bool connecthttpsHCGET (WiFiClient &client, const char *server, const char *hc_page)
+{
+	static const char c1[] = "curl -A \"";  //then platform
+   	static const char c2[] = "/";                    //then hc_version
+	static const char c3[] = "\" --max-time 15 --silent --retry 2 https://"; //then server 
+    static const char hc[] = "/ham/HamClock";        // then hc_page
+	int memlen = strlen(c1)+strlen(platform)+strlen(c2)+strlen(hc_version)+strlen(c3)+strlen(server)+strlen(hc)+strlen(hc_page)+1;
+	StackMalloc curlbuf(memlen);
+	char *curl = (char *) curlbuf.getMem();
+	snprintf (curl, memlen, "%s%s%s%s%s%s%s%s",c1,platform,c2,hc_version,c3,server,hc, hc_page);
+	printf("wifi: connecting to command %s\n",curl);
+    return (client.connectCommand(curl));
 }
 
 /* skip the given wifi client stream ahead to just after the first blank line, return whether ok.

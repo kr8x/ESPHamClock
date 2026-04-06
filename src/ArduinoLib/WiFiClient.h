@@ -30,6 +30,14 @@
 #include "Arduino.h"
 #include "IPAddress.h"
 
+/*
+ * global function
+ */
+ extern void WiFiClientSetDefaultTimeout (int l);  // Call once to affect all new instances
+ const int READ_PENDING_MS = 10000;      // max read wait time, ms
+/*
+ * Class description
+ */
 class WiFiClient {
 
     public:
@@ -37,6 +45,7 @@ class WiFiClient {
 	WiFiClient();
 	WiFiClient(int fd);
 	bool connect (const char *host, int port);
+	bool connectCommand (const char *cmd);
 	bool connect (IPAddress ip, int port);
 	void stop (void);
 	int available(int pending_ms = 0);
@@ -63,7 +72,7 @@ class WiFiClient {
 
     private:
 
-        const int READ_PENDING_MS = 10000;      // max read wait time, ms
+
 	int socket;                             // open if >= 0
   	uint8_t peek[4096*10];                  // read-ahead buffer
   	int n_peek;                             // n useful values in peek[]
@@ -73,6 +82,9 @@ class WiFiClient {
         int tout (int to_ms, int fd);
         bool pending(int ms);
         void logBuffer (const uint8_t *buf, int nbuf);
+		
+	bool m_isPipe;
+    FILE* m_pipe;	
 
 };
 

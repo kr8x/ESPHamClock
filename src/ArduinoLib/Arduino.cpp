@@ -13,7 +13,7 @@
 #include <sys/resource.h>
 
 #include "Arduino.h"
-
+#include "WiFiClient.h"   // Included to get access to set WiFiClient timeout from _T and -T options
 // max cpu usage, throttle with -t
 #define DEF_CPU_USAGE 0.8F
 static float max_cpu_usage = DEF_CPU_USAGE;
@@ -23,6 +23,14 @@ std::string our_dir;            // our storage directory, including trailing /
 bool rm_eeprom;                 // set by -0 to rm eeprom to restore defaults
 bool ignore_x11geom;            // set by -q to ignore startup loc and size
 
+
+#if defined(_VERSION_HTTPS)
+  bool version_https=true;
+#else
+  bool version_https=false;             // forces https to be used for fetching version	
+#endif
+	
+
 // list of diagnostic files, newest first
 const char *diag_files[N_DIAG_FILES] = {
     "diagnostic-log.txt",
@@ -30,10 +38,13 @@ const char *diag_files[N_DIAG_FILES] = {
     "diagnostic-log-1.txt",
     "diagnostic-log-2.txt"
 };
-
+// helper macro to get value of macro without quotes
+#define STRINGIFY(x) #x
+#define TOSTRING(x)  STRINGIFY(x)
 
 // how we were made
-char build_variables[64];
+char build_variables[128];
+char build_B[128];
 
 #if defined(_USE_FB0)
   #if defined(_CLOCK_1600x960)
@@ -73,6 +84,8 @@ char build_variables[64];
 // public for user agent
 const char *pw_file;
 
+
+
 /* initialize build variables */
 static void initBuildVariables(void)
 {
@@ -80,15 +93,18 @@ static void initBuildVariables(void)
     #if defined(_FB_DEPTH)
         snprintf (build_variables, sizeof(build_variables), "FB_DEPTH=%d ", _FB_DEPTH);
     #endif
-    #if defined(_A)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DA=%s ", _A);
+    #if defined(_T)
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "T=%d ", _T);
     #endif
     #if defined(_B)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DB=%s ", _B);
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "B=%s ", TOSTRING(_B));
     #endif
     #if defined(_S)
-        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "-DS=%s ", _S);
+        snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "S=%s ", TOSTRING(_S));
     #endif
+	#if defined(_VERSION_HTTPS)
+	    snprintf (build_variables+strlen(build_variables), sizeof(build_variables)-strlen(build_variables), "VERSION_HTTPS=1 ");
+	#endif
     #if defined(_WIFI_NEVER)
         strcat(build_variables, "WIFI_NEVER=1 ");
     #endif	
@@ -401,7 +417,9 @@ static void usage (const char *errfmt, ...)
             fprintf (stderr, " -r p : set read-only live web server port to p or -1 to disable; default %d\n",
                                     LIVEWEB_RO_PORT);
             fprintf (stderr, " -s d : start time as if UTC now is d formatted as YYYY-MM-DDTHH:MM:SS\n");
+			fprintf (stderr, " -S s : set Software server host for OTA download; default is %s\nMust come after -b if used\n",software_host);
             fprintf (stderr, " -t p : throttle max cpu to p percent; default is %.0f\n", DEF_CPU_USAGE*100);
+            fprintf (stderr, " -T t : set max timeout for responses from backend\n");			
             fprintf (stderr, " -v   : show version info then exit\n");
             fprintf (stderr, " -w p : set read-write live web server port to p or -1 to disable; default %d\n",
                                     LIVEWEB_RW_PORT);
@@ -436,7 +454,39 @@ static void crackArgs (int ac, char *av[])
         const char *new_appdir = NULL;
         bool cl_set = false;
         int max_lw = 0;
-
+// process build variables before processing command options that override them
+    #if defined(_T)
+		{
+			char *myt = strdup(TOSTRING(_T));
+			int to = atoi(myt);
+			if (to < 1  || to > 65)	
+				usage ("build error, T=timout, timeout must be [1,65] seconds");
+			WiFiClientSetDefaultTimeout(to);
+		}
+    #endif
+// Process B first since it modifies backend_host and software_host for backward compatibility to -b arg
+    #if defined(_B)
+		{
+			 char *myb = strdup(TOSTRING(_B));      		 
+             char *myb_colon = strchr (myb, ':');
+             if (myb_colon) {
+                *myb_colon = '\0';                  // put EOS after host
+                backend_host = myb;
+				software_host = myb;
+                backend_port = atoi(myb_colon+1);
+                if (backend_port < 1 || backend_port > 65535)
+                   usage ("build error, B=host:port, port must be [1,65355]");
+			 } else {
+		        usage ("build error, B=host:port, : missing");
+			 }
+		}
+    #endif
+    #if defined(_S)
+	    {
+            char *myb = strdup(TOSTRING(_S));
+			software_host = myb;
+	    }		
+    #endif
         while (--ac && **++av == '-') {
             char *s = *av;
             while (*++s) {
@@ -468,6 +518,7 @@ static void crackArgs (int ac, char *av[])
                         if (myb_colon) {
                             *myb_colon = '\0';                  // put EOS after host
                             backend_host = myb;
+							software_host = myb;
                             backend_port = atoi(myb_colon+1);
                             if (backend_port < 1 || backend_port > 65535)
                                 usage ("-b port must be [1,65355]");
@@ -482,13 +533,16 @@ static void crackArgs (int ac, char *av[])
                     new_appdir = *++av;
                     ac--;
                     break;
-                case 'e':
+                case 'e': 
                     if (ac < 2)
                         usage ("missing RESTful port number for -e");
                     restful_port = atoi(*++av);
                     ac--;
                     break;
                 case 'f':
+					if (ac < 2)
+						usage ("Missing timeout for -t");
+					
                     if (ac < 2) {
                         usage ("missing arg for -f");
                     } else {
@@ -563,6 +617,14 @@ static void crackArgs (int ac, char *av[])
                     setUsrDateTime(*++av);
                     ac--;
                     break;
+                case 'S': {
+						if (ac < 2)
+							usage ("missing software server for -S");
+						char *mys = strdup(*++av);
+						software_host = mys;
+						ac--;
+					}
+                    break;
                 case 't':
                     if (ac < 2)
                         usage ("missing percentage for -t");
@@ -571,6 +633,14 @@ static void crackArgs (int ac, char *av[])
                         usage ("-t percentage must be [10,100]");
                     ac--;
                     break;
+				case 'T': {
+						if (ac < 2)
+							usage ("Missing timeout for -T");
+						int to = atoi(*++av);
+						ac--;
+						WiFiClientSetDefaultTimeout(to);
+					}
+					break;
                 case 'v':
                     showVersion();
                     exit(0);
@@ -597,6 +667,11 @@ static void crackArgs (int ac, char *av[])
                 }
             }
         }
+
+
+        // if software host and back are different, get version from software host via https
+		if (strcmp(backend_host,software_host) != 0)
+			version_https=true;
 
         // initial checks
         if (ac > 0)
